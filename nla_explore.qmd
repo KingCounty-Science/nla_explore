@@ -1,0 +1,130 @@
+---
+title: "Compare King Co Lakes With National Lakes Assessment Data"
+author: "Curtis DeGasperi"
+format: html
+server: shiny
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+---
+
+## Using Puget Lowland National Lakes Assessment (NLA) data to put King Co. stewardship lakes in context
+
+A total of 27 lakes across the Puget Lowland of the Puget Sound basin have been sampled as part of the U.S. Environmental Protection Agency's (EPA) [National Lakes Assessment (NLA)](https://www.epa.gov/national-aquatic-resource-surveys/nla). Sampling took place in 2007, 2012, 2017, and 2022 and some lakes have been sampled once while some have been sampled up to three times. Even though the number of lakes sampled is not terribly large, this sample is relatively unbiased so I though the data might help put our King County Stewardship Program lakes into context with other lakes across the region.
+
+NLA water quality sampling occurs once between July and September in a particular year. Samples are collected from a central location at the 1-m depth. I averaged the NLA chlorophyll a and total phosphorus data for lakes with more than one year of data and I averaged the King Co. lake data for samples collected between July and August at 1-m depth for 2020 to 2024. I calculated the empirical cumulative distribution function (ecdf) of the NLA data and then determined the position of each King Co. lake in the NLA distribution via linear interpolation.
+
+The application below allows you to pick any particular King Co. lake to highlight its position relative to the NLA lakes and you can hover over any data point to identify the lake, ecdf value, and parameter concentration.
+
+I think total nitrogen and Secchi depth (and maybe true color?) are the other NLA variables that could be included in this comparison (or a similar comparison). And what's up with Welcome Lake?
+
+```{r}
+#| echo: false
+#| warning: false
+
+# Load data for plotting
+suppressPackageStartupMessages(library(tidyverse, quietly = T))
+suppressWarnings(library(lubridate))
+suppressWarnings(library(plotly))
+
+### King Co and NLA data - Chla and TP
+
+nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
+nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
+
+###
+```
+
+```{r}
+#| echo: false
+#| warning: false
+
+# library(shiny)
+
+nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
+nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
+
+lakes <- sort(unique(nla_ecdf.chla$SiteName[!nla_ecdf.chla$Type=='NLA']))
+selectInput("SiteName", "Choose Lake:", lakes, selected = "Welcome")
+
+###
+```
+
+```{r}
+
+mainPanel(plotlyOutput('graph'))
+
+###
+```
+
+```{r}
+#| echo: false
+#| warning: false
+#| context: server
+
+suppressWarnings(library(plotly))
+
+nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
+nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
+
+a1 <- reactive({
+  # m <- nla_ecdf.chla[nla_ecdf.chla$SiteName=='Star', ]
+  m <- nla_ecdf.chla[nla_ecdf.chla$SiteName==input$SiteName, ]
+  a <- list(
+  x = log10(m$Value),
+  y = m$ecdf,
+  text = m$SiteName,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 70,
+  ay = 0
+)
+  return(a)
+})
+
+a2 <- reactive({
+  # m <- nla_ecdf.tp[nla_ecdf.tp$SiteName=='Star', ]
+  m <- nla_ecdf.tp[nla_ecdf.tp$SiteName==input$SiteName, ]
+  a <- list(
+  x = m$Value,
+  y = m$ecdf,
+  text = m$SiteName,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 70,
+  ay = 0
+)
+return(a)
+})
+
+  output$graph <- renderPlotly({
+    fig1 <- plot_ly(nla_ecdf.chla, x = ~log10(Value), y = ~ecdf, color = ~Type, showlegend = FALSE, type = 'scatter', mode = 'markers', hoverinfo = 'text',
+                text = ~paste('</br> Value: ', round(Value,1),
+                              '</br> Fn(Value): ', round(ecdf,2),
+                              '</br> Lake: ', SiteName))
+fig1 <- fig1 %>% layout(annotations = a1(), title = "Chlorophyll a (µg/L)", xaxis = list(title = "log10[Chlorophyll a (µg/L)]", size = 14))
+
+fig2 <- plot_ly(nla_ecdf.tp, x = ~Value, y = ~ecdf, color = ~Type, type = 'scatter', mode = 'markers', hoverinfo = 'text',
+                text = ~paste('</br> Value: ', round(Value,1),
+                              '</br> Fn(Value): ', round(ecdf,2),
+                              '</br> Lake: ', SiteName))
+fig2 <- fig2 %>% layout(annotations = a2(), title = "Compare King Co Lakes with National Lakes Assessment Data", xaxis = list(title = "Total Phosphorus (µg/L)", size = 14))
+
+    print(subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE))
+
+  })
+```
+
+```{r}
+#| context: server
+# output$distPlot <- renderPlot({
+#    subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE)
+# })
+# SiteName()
+```
+
+Note: The U.S. EPA provides a tool to compare a single lake mean value to state, ecoregion, and national NLA data. The Lake Context Tool can be found [here](https://rconnect-public.epa.gov/nla-lake-context-tool/).
+
+An accessible introduction to the NLA program and its promise and potential can be found in this 2018 in this L&O Bulletin article by [Pollard et al](https://aslopubs.onlinelibrary.wiley.com/doi/10.1002/lob.10238).
