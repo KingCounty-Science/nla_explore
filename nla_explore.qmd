@@ -112,18 +112,12 @@ fig2 <- plot_ly(nla_ecdf.tp, x = ~Value, y = ~ecdf, color = ~Type, type = 'scatt
                               '</br> Lake: ', SiteName))
 fig2 <- fig2 %>% layout(annotations = a2(), title = "Compare King Co Lakes with National Lakes Assessment Data", xaxis = list(title = "Total Phosphorus (µg/L)", size = 14))
 
-    print(subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE))
+#     print(subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE))
+    subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE)
 
   })
 ```
 
-```{r}
-#| context: server
-# output$distPlot <- renderPlot({
-#    subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE)
-# })
-# SiteName()
-```
 
 Note: The U.S. EPA provides a tool to compare a single lake mean value to state, ecoregion, and national NLA data. The Lake Context Tool can be found [here](https://rconnect-public.epa.gov/nla-lake-context-tool/).
 
