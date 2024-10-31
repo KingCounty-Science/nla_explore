@@ -1,9 +1,12 @@
 ---
 title: "Compare King Co Lakes With National Lakes Assessment Data"
 author: "Curtis DeGasperi"
-format: html
+format:
+  html:
+    embed-resources: true
 server: shiny
-date: "`r format(Sys.time(), '%d %B, %Y')`"
+standalone: true
+date: today
 ---
 
 ## Using Puget Lowland National Lakes Assessment (NLA) data to put King Co. stewardship lakes in context
@@ -36,21 +39,40 @@ nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
 ```{r}
 #| echo: false
 #| warning: false
-
+ 
 # library(shiny)
 
 nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
 nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
+nla_ecdf.tn <- readRDS('nla_ecf.tn.RDS')
+nla_ecdf.secchi <- readRDS('nla_ecf.secchi.RDS')
 
 lakes <- sort(unique(nla_ecdf.chla$SiteName[!nla_ecdf.chla$Type=='NLA']))
 selectInput("SiteName", "Choose Lake:", lakes, selected = "Welcome")
+
+# mainPanel(plotlyOutput('graph1'),plotlyOutput('graph2'),plotlyOutput('graph3'))
+mainPanel(
+          fluidRow(
+            column(4, style = 'padding:10px',
+            plotlyOutput('graph1',width='100%'),
+            ),
+          fluidRow(
+            column(4, style = 'padding:10px',
+            plotlyOutput('graph2',width='100%'),
+          ),
+          fluidRow(
+            column(4, style = 'padding:20px',
+            plotlyOutput('graph3',height=600,width='100%'),
+            )
+          ))))
 
 ###
 ```
 
 ```{r}
+#| panel: fill
 
-mainPanel(plotlyOutput('graph'))
+# mainPanel(plotlyOutput('graph'))
 
 ###
 ```
@@ -61,9 +83,26 @@ mainPanel(plotlyOutput('graph'))
 #| context: server
 
 suppressWarnings(library(plotly))
+suppressPackageStartupMessages(library(tidyverse, quietly = T))
 
 nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
 nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
+nla_ecdf.tn <- readRDS('nla_ecf.tn.RDS')
+nla_ecdf.secchi <- readRDS('nla_ecf.secchi.RDS')
+nla_ecdf.tntp <- readRDS('nla_ecf.tntp.RDS')
+
+tsi.chla <- nla_ecdf.chla %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(CHL)` = 9.81*log(Value)+30.6) %>% select(-Value)
+tsi.tp <- nla_ecdf.tp %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(TP)` = 14.42*log(Value)+4.15) %>% select(-Value)
+tsi.tn <- nla_ecdf.tn %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(TN)` = 14.43*log(Value)+54.45) %>% select(-Value)
+tsi.secchi <- nla_ecdf.secchi %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(SD)` = 60-14.41*log(Value)) %>% select(-Value)
+tsi.tntp <- nla_ecdf.tntp %>% select(Lake,Type,SiteName,Value) %>% rename(`TN:TP` = Value) %>% mutate(`TN:TP` = round(`TN:TP`,0),`TN:TP bin` = cut(`TN:TP`,c(0,22,30,Inf),labels=c("0-22",">22-30",">30")))
+# add cut labels
+
+# tsi <- left_join(tsi.chla,tsi.tp,by=c("Lake","Type","SiteName"))
+# tsi <- left_join(tsi,tsi.tn,by=c("Lake","Type","SiteName"))
+# tsi <- left_join(tsi,tsi.secchi,by=c("Lake","Type","SiteName"))
+tsi <- purrr::reduce(list(tsi.chla,tsi.tp,tsi.tn,tsi.secchi,tsi.tntp), dplyr::left_join, by = c("Lake","Type","SiteName"))
+tsi <- mutate(tsi,`TSI(CHL)-TSI(SD)` = `TSI(CHL)`-`TSI(SD)`, `TSI(CHL)-TSI(TP)` = `TSI(CHL)`-`TSI(TP)`)
 
 a1 <- reactive({
   # m <- nla_ecdf.chla[nla_ecdf.chla$SiteName=='Star', ]
@@ -99,26 +138,148 @@ a2 <- reactive({
 return(a)
 })
 
-  output$graph <- renderPlotly({
+a3 <- reactive({
+  # m <- nla_ecdf.tp[nla_ecdf.tp$SiteName=='Star', ]
+  m <- nla_ecdf.secchi[nla_ecdf.secchi$SiteName==input$SiteName, ]
+  a <- list(
+  x = m$Value,
+  y = m$ecdf,
+  text = m$SiteName,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 70,
+  ay = 0
+)
+return(a)
+})
+
+a4 <- reactive({
+  # m <- nla_ecdf.tp[nla_ecdf.tp$SiteName=='Star', ]
+  m <- nla_ecdf.tn[nla_ecdf.tn$SiteName==input$SiteName, ]
+  a <- list(
+  x = m$Value,
+  y = m$ecdf,
+  text = m$SiteName,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 70,
+  ay = 0
+)
+return(a)
+})
+
+a5 <- reactive({
+  # m <- nla_ecdf.tp[nla_ecdf.tp$SiteName=='Star', ]
+  m <- tsi[tsi$SiteName==input$SiteName, ]
+  a <- list(
+  x = m$`TSI(CHL)-TSI(SD)`,
+  y = m$`TSI(CHL)-TSI(TP)`,
+  text = m$SiteName,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 70,
+  ay = 0
+)
+return(a)
+})
+
+a6 <- reactive({
+  # m <- nla_ecdf.tp[nla_ecdf.tp$SiteName=='Star', ]
+  m <- nla_ecdf.tntp[nla_ecdf.tntp$SiteName==input$SiteName, ]
+  a <- list(
+  x = m$Value,
+  y = m$ecdf,
+  text = m$SiteName,
+  xref = "x",
+  yref = "y",
+  showarrow = TRUE,
+  arrowhead = 7,
+  ax = 70,
+  ay = 0
+)
+return(a)
+})
+
+vline <- function(x = 0, color = "green") {
+  list(
+    type = "line",
+    y0 = 0,
+    y1 = 1,
+    yref = "paper",
+    x0 = x,
+    x1 = x,
+    line = list(color = color, dash="dot")
+  )
+}
+
+    output$graph1 <- renderPlotly({
     fig1 <- plot_ly(nla_ecdf.chla, x = ~log10(Value), y = ~ecdf, color = ~Type, showlegend = FALSE, type = 'scatter', mode = 'markers', hoverinfo = 'text',
-                text = ~paste('</br> Value: ', round(Value,1),
+                text = ~paste('</br> Chlorophyll: ', round(Value,1),
                               '</br> Fn(Value): ', round(ecdf,2),
                               '</br> Lake: ', SiteName))
 fig1 <- fig1 %>% layout(annotations = a1(), title = "Chlorophyll a (µg/L)", xaxis = list(title = "log10[Chlorophyll a (µg/L)]", size = 14))
 
 fig2 <- plot_ly(nla_ecdf.tp, x = ~Value, y = ~ecdf, color = ~Type, type = 'scatter', mode = 'markers', hoverinfo = 'text',
-                text = ~paste('</br> Value: ', round(Value,1),
+                text = ~paste('</br> Total P: ', round(Value,1),
                               '</br> Fn(Value): ', round(ecdf,2),
                               '</br> Lake: ', SiteName))
 fig2 <- fig2 %>% layout(annotations = a2(), title = "Compare King Co Lakes with National Lakes Assessment Data", xaxis = list(title = "Total Phosphorus (µg/L)", size = 14))
 
 #     print(subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE))
-    subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE)
-
+    p <- subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE)
+    p
   })
+
+      output$graph2 <- renderPlotly({
+    fig1 <- plot_ly(nla_ecdf.secchi, x = ~Value, y = ~ecdf, color = ~Type, showlegend = FALSE, type = 'scatter', mode = 'markers', hoverinfo = 'text',
+                text = ~paste('</br> Secchi: ', round(Value,1),
+                              '</br> Fn(Value): ', round(ecdf,2),
+                              '</br> Lake: ', SiteName))
+fig1 <- fig1 %>% layout(annotations = a3(), xaxis = list(title = "Secchi depth (m)]", size = 14))
+
+# fig2 <- plot_ly(nla_ecdf.tn, x = ~Value, y = ~ecdf, color = ~Type, type = 'scatter', mode = 'markers', hoverinfo = 'text',
+#                 text = ~paste('</br> Total N: ', round(Value,1),
+#                               '</br> Fn(Value): ', round(ecdf,2),
+#                               '</br> Lake: ', SiteName))
+# fig2 <- fig2 %>% layout(annotations = a4(), xaxis = list(title = "Total Nitrogen (µg/L)", size = 14))
+ fig2 <- plot_ly(nla_ecdf.tntp, x = ~Value, y = ~ecdf, color = ~Type, type = 'scatter', mode = 'markers', hoverinfo = 'text',
+                 text = ~paste('</br> TN:TP: ', round(Value,1),
+                               '</br> Fn(Value): ', round(ecdf,2),
+                               '</br> Lake: ', SiteName))
+ # fig2 <- fig2 %>% layout(annotations = a4(), xaxis = list(title = "Total Nitrogen (µg/L)", size = 14))
+ fig2 <- fig2 %>% layout(annotations = a6(), xaxis = list(title = "TN:TP", size = 14), shapes = list(vline(30)))
+
+#     print(subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE))
+    p <- subplot(fig1,fig2,shareY=TRUE, titleX = TRUE, titleY = TRUE)
+    p
+  })
+
+          output$graph3 <- renderPlotly({
+            
+    fig1 <- plot_ly(tsi, x = ~`TSI(CHL)-TSI(SD)`, y = ~`TSI(CHL)-TSI(TP)`, color = ~`TN:TP bin`, symbol = ~Type, size = 4, showlegend = TRUE, type = 'scatter', mode = 'markers', hoverinfo = 'text',
+                text = ~paste('</br> TSI(CHL): ', round(`TSI(CHL)`,1),
+                              '</br> TSI(TP): ', round(`TSI(TP)`,1),
+                              '</br> TSI(SD): ', round(`TSI(SD)`,1),
+                              '</br> TN:TP: ', round(`TN:TP`,1),
+                              '</br> Type: ', Type,
+                              '</br> Lake: ', SiteName))
+    fig1 <- fig1 %>% layout(annotations = a5(), title = "<--Smaller particles predominate  ----- Larger particles predominate----->             .", legend = list(title=list(text='<b>TN:TP</b>')))
+    # fig1 <- fig1 %>% layout(annotations = list(text = "YOUR TEXT HERE",  x = 0, y = 5, showarrow=FALSE))
+    fig1 <- fig1 %>% add_annotations(x=20,y=0,text="------- Increasing phosphorus limitation -------->", showarrow=FALSE, textangle = 270, font=list(size=18))
+    # fig1 <- fig1 %>% add_annotations(yref='paper',xref="paper",y=1.05,x=1.18, text="TN:TP",showarrow=F)
+          })
 ```
+
 
 
 Note: The U.S. EPA provides a tool to compare a single lake mean value to state, ecoregion, and national NLA data. The Lake Context Tool can be found [here](https://rconnect-public.epa.gov/nla-lake-context-tool/).
 
-An accessible introduction to the NLA program and its promise and potential can be found in this 2018 in this L&O Bulletin article by [Pollard et al](https://aslopubs.onlinelibrary.wiley.com/doi/10.1002/lob.10238).
+An accessible introduction to the NLA program and its promise and potential can be found in this 2018 in this L&O Bulletin article by [Pollard et al. (2018)](https://aslopubs.onlinelibrary.wiley.com/doi/10.1002/lob.10238).
+
+The trophic state graph and its utility is described in [Carlson and Havens (1992)](https://www.researchgate.net/profile/Robert-Carlson-2/publication/233112088_Simple_Graphical_Methods_for_the_Interpretation_of_Relationships_Between_Trophic_State_Variables/links/548a27ee0cf214269f1ac2dd/Simple-Graphical-Methods-for-the-Interpretation-of-Relationships-Between-Trophic-State-Variables.pdf).
