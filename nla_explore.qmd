@@ -19,33 +19,15 @@ The application below allows you to pick any particular King Co. lake to highlig
 
 I think total nitrogen and Secchi depth (and maybe true color?) are the other NLA variables that could be included in this comparison (or a similar comparison). And what's up with Welcome Lake?
 
-```{r}
+```{r UI}
 #| echo: false
 #| warning: false
 
-# Load data for plotting
 suppressPackageStartupMessages(library(tidyverse, quietly = T))
-suppressWarnings(library(lubridate))
 suppressWarnings(library(plotly))
 
-### King Co and NLA data - Chla and TP
-
+# data needed to load King Co lake names into dropdown list 
 nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
-nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
-
-###
-```
-
-```{r}
-#| echo: false
-#| warning: false
- 
-# library(shiny)
-
-nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
-nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
-nla_ecdf.tn <- readRDS('nla_ecf.tn.RDS')
-nla_ecdf.secchi <- readRDS('nla_ecf.secchi.RDS')
 
 lakes <- sort(unique(nla_ecdf.chla$SiteName[!nla_ecdf.chla$Type=='NLA']))
 selectInput("SiteName", "Choose Lake:", lakes, selected = "Welcome")
@@ -69,15 +51,8 @@ mainPanel(
 ###
 ```
 
-```{r}
-#| panel: fill
 
-# mainPanel(plotlyOutput('graph'))
-
-###
-```
-
-```{r}
+```{r Server}
 #| echo: false
 #| warning: false
 #| context: server
@@ -85,22 +60,20 @@ mainPanel(
 suppressWarnings(library(plotly))
 suppressPackageStartupMessages(library(tidyverse, quietly = T))
 
+# load data for plots
 nla_ecdf.chla <- readRDS('nla_ecf.chla.RDS')
 nla_ecdf.tp <- readRDS('nla_ecf.tp.RDS')
 nla_ecdf.tn <- readRDS('nla_ecf.tn.RDS')
 nla_ecdf.secchi <- readRDS('nla_ecf.secchi.RDS')
 nla_ecdf.tntp <- readRDS('nla_ecf.tntp.RDS')
 
+# derive some additional variables - Trophic State Inices and TN:TP bins
 tsi.chla <- nla_ecdf.chla %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(CHL)` = 9.81*log(Value)+30.6) %>% select(-Value)
 tsi.tp <- nla_ecdf.tp %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(TP)` = 14.42*log(Value)+4.15) %>% select(-Value)
 tsi.tn <- nla_ecdf.tn %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(TN)` = 14.43*log(Value)+54.45) %>% select(-Value)
 tsi.secchi <- nla_ecdf.secchi %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(SD)` = 60-14.41*log(Value)) %>% select(-Value)
 tsi.tntp <- nla_ecdf.tntp %>% select(Lake,Type,SiteName,Value) %>% rename(`TN:TP` = Value) %>% mutate(`TN:TP` = round(`TN:TP`,0),`TN:TP bin` = cut(`TN:TP`,c(0,22,30,Inf),labels=c("0-22",">22-30",">30")))
-# add cut labels
 
-# tsi <- left_join(tsi.chla,tsi.tp,by=c("Lake","Type","SiteName"))
-# tsi <- left_join(tsi,tsi.tn,by=c("Lake","Type","SiteName"))
-# tsi <- left_join(tsi,tsi.secchi,by=c("Lake","Type","SiteName"))
 tsi <- purrr::reduce(list(tsi.chla,tsi.tp,tsi.tn,tsi.secchi,tsi.tntp), dplyr::left_join, by = c("Lake","Type","SiteName"))
 tsi <- mutate(tsi,`TSI(CHL)-TSI(SD)` = `TSI(CHL)`-`TSI(SD)`, `TSI(CHL)-TSI(TP)` = `TSI(CHL)`-`TSI(TP)`)
 
@@ -276,10 +249,11 @@ fig1 <- fig1 %>% layout(annotations = a3(), xaxis = list(title = "Secchi depth (
           })
 ```
 
-
-
 Note: The U.S. EPA provides a tool to compare a single lake mean value to state, ecoregion, and national NLA data. The Lake Context Tool can be found [here](https://rconnect-public.epa.gov/nla-lake-context-tool/).
 
 An accessible introduction to the NLA program and its promise and potential can be found in this 2018 in this L&O Bulletin article by [Pollard et al. (2018)](https://aslopubs.onlinelibrary.wiley.com/doi/10.1002/lob.10238).
 
 The trophic state graph and its utility is described in [Carlson and Havens (1992)](https://www.researchgate.net/profile/Robert-Carlson-2/publication/233112088_Simple_Graphical_Methods_for_the_Interpretation_of_Relationships_Between_Trophic_State_Variables/links/548a27ee0cf214269f1ac2dd/Simple-Graphical-Methods-for-the-Interpretation-of-Relationships-Between-Trophic-State-Variables.pdf).
+
+The vertical line on the TN:TP plot represents a TN:TP break at 30 (by mass). A low TN:TP ratio has been associated with cyanobacteria blooms, but some research suggests that a low TN:TP ratio could be the result of cyanobacteria blooms rather than a cause...see for example [Smith (1983)](https://www.science.org/doi/10.1126/science.221.4611.669). 
+

@@ -1,4 +1,4 @@
 - source: nla_explore.qmd
   quarto-pub:
     - id: 80075da3-3d78-41ba-8592-0341b9a1a515
-      url: 'https://quartopub.com/sites/lakes/compare-king-co-lakes-with-national-lakes-assessment-data-a83b'
+      url: 'https://lakes.quarto.pub/compare-king-co-lakes-with-national-lakes-assessment-data-a83b'
