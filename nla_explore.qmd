@@ -67,7 +67,7 @@ nla_ecdf.tn <- readRDS('nla_ecf.tn.RDS')
 nla_ecdf.secchi <- readRDS('nla_ecf.secchi.RDS')
 nla_ecdf.tntp <- readRDS('nla_ecf.tntp.RDS')
 
-# derive some additional variables - Trophic State Inices and TN:TP bins
+# derive some additional variables - Trophic State Indices and TN:TP bins
 tsi.chla <- nla_ecdf.chla %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(CHL)` = 9.81*log(Value)+30.6) %>% select(-Value)
 tsi.tp <- nla_ecdf.tp %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(TP)` = 14.42*log(Value)+4.15) %>% select(-Value)
 tsi.tn <- nla_ecdf.tn %>% select(Lake,Type,SiteName,Value) %>% mutate(`TSI(TN)` = 14.43*log(Value)+54.45) %>% select(-Value)
